@@ -14,8 +14,8 @@ pub struct CliArgs {
 	#[argh(option, default = "String::from(\"0.0.0.0\")")]
 	/// the image host ip (ipv4) to bind to (default: 0.0.0.0)
 	pub image_host: String,
-	#[argh(option, default = "80")]
-	/// the image port to bind to (default: 80)
+	#[argh(option, default = "8080")]
+	/// the image port to bind to (default: 8080)
 	pub image_port: u16,
 }
 
