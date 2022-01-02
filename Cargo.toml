@@ -15,3 +15,6 @@ argh = "^0.1.7"
 [dependencies.tokio]
 version = "^1.15.0"
 features = ["full"]
+
+[profile.release]
+lto = "thin"
