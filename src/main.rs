@@ -183,9 +183,8 @@ async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContai
 				Content-Length: {}\r\n\r\n", stdout.len())
 					.as_bytes()).await;
 
-				if let Err(e) = client.write_all(&stdout).await {
-					error!("Failed to write image for {}: {}", addr, e);
-				}
+				let _ = client.write_all(&stdout).await;
+				let _ = client.flush().await;
 				return;
 			} else {
 				error!("Failed to read ffmpeg capture for {}", addr);
@@ -199,6 +198,7 @@ async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContai
 async fn emit_http_500(mut client: TcpStream) {
 	let _ = client.write_all(b"HTTP/1.1 500\r\n\
 				Content-Length: 0").await;
+	let _ = client.flush().await;
 }
 
 async fn listen_for_new_video_sockets(listener: TcpListener, socks: SocksContainer) {
