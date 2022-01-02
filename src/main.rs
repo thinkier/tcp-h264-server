@@ -3,7 +3,6 @@ extern crate argh;
 extern crate env_logger;
 #[macro_use]
 extern crate log;
-extern crate tempdir;
 extern crate tokio;
 
 use std::collections::{HashMap, HashSet};
@@ -12,7 +11,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use log::LevelFilter;
-use tempdir::TempDir;
 use tokio::io::{AsyncWriteExt, Result as IoResult, stdin};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::process::{ChildStdin, Command};
@@ -155,17 +153,15 @@ async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContai
 		tokio::spawn(async move {
 			let addr = addr.to_string();
 			info!("Image requested {}", addr);
-			let dir = TempDir::new("h264-frame-extractor").unwrap();
 			let mut child = Command::new("ffmpeg")
-				.current_dir(dir.path())
 				.args(&[
 					"-i", "-",
 					"-ss", "0.5",
 					"-vframes", "1",
-					"image.png"
+					"pipe:"
 				])
 				.stdin(Stdio::piped())
-				.stdout(Stdio::null())
+				.stdout(Stdio::piped())
 				.spawn()
 				.unwrap();
 
@@ -176,23 +172,14 @@ async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContai
 				return;
 			}
 
-			let exit = child.wait().await.map(|e| e.code()
-				.unwrap_or(-1))
-				.unwrap_or(-1);
-
-			if exit != 0 {
-				error!("Caught non-zero ffmpeg exit code for {}", addr);
-				emit_http_500(client).await;
-				return;
-			}
-
-			if let Ok(file) = tokio::fs::read(dir.path().join("image.png")).await {
+			if let Ok(output) = child.wait_with_output().await {
+				let stdout = output.stdout;
 				let _ = client.write_all(format!("HTTP/1.1 200\r\n\
 				Content-Type: image/png\r\n\
-				Content-Length: {}\r\n\r\n", file.len())
+				Content-Length: {}\r\n\r\n", stdout.len())
 					.as_bytes()).await;
 
-				let _ = client.write_all(&file).await;
+				let _ = client.write_all(&stdout).await;
 				return;
 			} else {
 				error!("Failed to read ffmpeg capture for {}", addr);
