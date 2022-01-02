@@ -66,6 +66,7 @@ impl<R: AsyncReadExt + Unpin> H264Stream<R> {
 	}
 }
 
+#[derive(Clone)]
 pub struct H264NalUnit {
 	pub unit_code: u8,
 	pub raw_bytes: Vec<u8>,
