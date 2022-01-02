@@ -3,4 +3,4 @@ if [[ $* ]]; then
 fi
 
 # Cross compile
-docker run -v "$(pwd):/app" ghcr.io/thinkier/tcp-h264-server-armv7-build
+docker run -v "$(pwd):/app" -v "$HOME/.cargo/registry:/root/.cargo/registry" ghcr.io/thinkier/tcp-h264-server-armv7-build
