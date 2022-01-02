@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use log::LevelFilter;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufStream, Result as IoResult, stdin};
+use tokio::io::{AsyncWriteExt, Result as IoResult, stdin};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::process::{ChildStdin, Command};
 use tokio::sync::{mpsc, Mutex};
@@ -183,7 +183,9 @@ async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContai
 				Content-Length: {}\r\n\r\n", stdout.len())
 					.as_bytes()).await;
 
-				let _ = client.write_all(&stdout).await;
+				if let Err(e) = client.write_all(&stdout).await {
+					error!("Failed to write image for {}: {}", addr, e);
+				}
 				return;
 			} else {
 				error!("Failed to read ffmpeg capture for {}", addr);
