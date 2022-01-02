@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use log::LevelFilter;
-use tokio::io::{AsyncWriteExt, Result as IoResult, stdin};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufStream, Result as IoResult, stdin};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::process::{ChildStdin, Command};
 use tokio::sync::{mpsc, Mutex};
@@ -148,10 +148,17 @@ async fn write_h264_stream(mut producer: Receiver<H264NalUnit>, socks: SocksCont
 }
 
 async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContainer) {
-	while let Ok((mut client, addr)) = listener.accept().await {
+	while let Ok((client, addr)) = listener.accept().await {
+		let mut client = BufStream::new(client);
 		let socks = socks.clone();
 		tokio::spawn(async move {
 			let addr = addr.to_string();
+			{
+				let mut sbuf = String::new();
+				let _ = client.read_line(&mut sbuf).await;
+				info!("{}: {}", addr,sbuf);
+			}
+
 			info!("Image requested {}", addr);
 			let mut child = Command::new("ffmpeg")
 				.args(&[
@@ -163,6 +170,7 @@ async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContai
 				])
 				.stdin(Stdio::piped())
 				.stdout(Stdio::piped())
+				.stderr(Stdio::null())
 				.spawn()
 				.unwrap();
 
@@ -191,7 +199,7 @@ async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContai
 	}
 }
 
-async fn emit_http_500(mut client: TcpStream) {
+async fn emit_http_500(mut client: BufStream<TcpStream>) {
 	let _ = client.write_all(b"HTTP/1.1 500\r\n\
 				Content-Length: 0").await;
 }
