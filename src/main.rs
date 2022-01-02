@@ -1,5 +1,9 @@
 #[macro_use]
 extern crate argh;
+extern crate tokio;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
@@ -26,6 +30,8 @@ pub fn am<T>(t: T) -> Am<T> {
 #[tokio::main]
 async fn main() {
 	let args = argh::from_env::<CliArgs>();
+	env_logger::init();
+
 	let (tx,rx) = mpsc::channel(60);
 	let socks = am(HashMap::new());
 	tokio::spawn(read_h264_stream(tx));
