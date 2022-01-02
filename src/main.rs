@@ -3,17 +3,22 @@ extern crate argh;
 extern crate env_logger;
 #[macro_use]
 extern crate log;
+extern crate tempdir;
 extern crate tokio;
 
 use std::collections::{HashMap, HashSet};
-use std::net::SocketAddr;
+use std::process::Stdio;
 use std::sync::Arc;
+use std::time::Duration;
 
 use log::LevelFilter;
-use tokio::io::{AsyncWriteExt, stdin};
+use tempdir::TempDir;
+use tokio::io::{AsyncWriteExt, Result as IoResult, stdin};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::process::{ChildStdin, Command};
 use tokio::sync::{mpsc, Mutex};
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::time::interval;
 
 use crate::cli::CliArgs;
 use crate::h264::{H264NalUnit, H264Stream};
@@ -22,7 +27,21 @@ mod cli;
 mod h264;
 
 pub type Am<T> = Arc<Mutex<T>>;
-pub type SocksContainer = Am<HashMap<SocketAddr, TcpStream>>;
+pub type SocksContainer = Am<HashMap<String, Writable>>;
+
+pub enum Writable {
+	TcpStream(TcpStream),
+	ChildStdin(ChildStdin),
+}
+
+impl Writable {
+	pub async fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
+		match self {
+			Writable::TcpStream(x) => x.write_all(buf).await,
+			Writable::ChildStdin(x) => x.write_all(buf).await,
+		}
+	}
+}
 
 pub fn am<T>(t: T) -> Am<T> {
 	Arc::new(Mutex::new(t))
@@ -41,15 +60,18 @@ async fn main() {
 	tokio::spawn(read_h264_stream(tx));
 	tokio::spawn(write_h264_stream(rx, socks.clone()));
 
-	let listener = args.start_listening().await;
-	listen_for_new_sockets(listener, socks).await;
+	let img = args.start_listening_for_image().await;
+	tokio::spawn(listen_for_new_image_requests(img, socks.clone()));
+
+	let vid = args.start_listening_for_video().await;
+	listen_for_new_video_sockets(vid, socks).await;
 }
 
 async fn read_h264_stream(consumer: Sender<H264NalUnit>) {
 	let mut stream = H264Stream::new(stdin());
 
 	// TODO Spawn a raspivid / libcamera-vid process
-	info!("Capturing H.264 video from /dev/stdin");
+	info!("Capturing H.264 video from stdin");
 
 	while let Ok(frame) = stream.next().await {
 		let _ = consumer.send(frame).await;
@@ -108,9 +130,8 @@ async fn write_h264_stream(mut producer: Receiver<H264NalUnit>, socks: SocksCont
 					sock.write_all(&frame.raw_bytes).await
 				};
 
-				if let Err(e) = write {
+				if let Err(_) = write {
 					errors.push(addr.to_owned());
-					warn!("Write error {} on {}, disconnecting...",e.to_string(), addr);
 				}
 			}
 		}
@@ -128,9 +149,83 @@ async fn write_h264_stream(mut producer: Receiver<H264NalUnit>, socks: SocksCont
 	}
 }
 
-async fn listen_for_new_sockets(listener: TcpListener, socks: SocksContainer) {
+async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContainer) {
+	while let Ok((mut client, addr)) = listener.accept().await {
+		let socks = socks.clone();
+		tokio::spawn(async move {
+			let addr = addr.to_string();
+			info!("Image requested {}", addr);
+			let dir = TempDir::new("h264-frame-extractor").unwrap();
+			let mut child = Command::new("ffmpeg")
+				.current_dir(dir.path())
+				.args(&[
+					"-i", "-",
+					"-ss", "0.5",
+					"-vframes", "1",
+					"image.png"
+				])
+				.stdin(Stdio::piped())
+				.stdout(Stdio::null())
+				.spawn()
+				.unwrap();
+
+			if let Some(stdin) = child.stdin.take() {
+				error!("Failed to obtain stdin of ffmpeg for {}", addr);
+				socks.lock().await.insert(addr.clone(), Writable::ChildStdin(stdin));
+				emit_http_500(client).await;
+				return;
+			}
+
+			let exit = child.wait().await.map(|e| e.code()
+				.unwrap_or(-1))
+				.unwrap_or(-1);
+
+			if exit != 0 {
+				error!("Caught non-zero ffmpeg exit code for {}", addr);
+				emit_http_500(client).await;
+				return;
+			}
+
+			if let Ok(file) = tokio::fs::read(dir.path().join("image.png")).await {
+				let _ = client.write_all(format!("HTTP/1.1 200\r\n\
+				Content-Type: image/png\r\n\
+				Content-Length: {}\r\n\r\n", file.len())
+					.as_bytes()).await;
+
+				let _ = client.write_all(&file).await;
+				return;
+			} else {
+				error!("Failed to read ffmpeg capture for {}", addr);
+				emit_http_500(client).await;
+				return;
+			}
+		});
+	}
+}
+
+async fn emit_http_500(mut client: TcpStream) {
+	let _ = client.write_all(b"HTTP/1.1 500\r\n\
+				Content-Length: 0").await;
+}
+
+async fn listen_for_new_video_sockets(listener: TcpListener, socks: SocksContainer) {
 	while let Ok((client, addr)) = listener.accept().await {
-		info!("Incoming connection at {:?}",addr);
-		socks.lock().await.insert(addr, client);
+		let addr = addr.to_string();
+		info!("Streaming to {}", addr);
+		socks.lock().await.insert(addr.clone(), Writable::TcpStream(client));
+
+		let socks = socks.clone();
+		tokio::spawn(async move {
+			let mut int = interval(Duration::from_millis(50));
+
+			loop {
+				int.tick().await;
+
+				if !socks.lock().await.contains_key(&addr) {
+					info!("Disconnected {}", addr);
+					return;
+				}
+			}
+		});
 	}
 }
