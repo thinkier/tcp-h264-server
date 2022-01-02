@@ -85,26 +85,23 @@ async fn write_h264_stream(mut producer: Receiver<H264NalUnit>, socks: SocksCont
 			for (addr, sock) in socks.lock().await.iter_mut() {
 				let write = if !known_socks.contains(addr) {
 					known_socks.insert(addr.to_owned());
-					let parameters = [&seq_param, &pic_param]
+					let mut frames = [&seq_param, &pic_param]
 						.into_iter()
 						.filter(|p| p.is_some())
-						.map(Clone::clone)
-						.map(Option::unwrap)
+						.flat_map(|p| p.into_iter())
 						.collect::<Vec<_>>();
+					frames.extend(&frame_buffer);
+					frames.push(&frame);
 
 					let mut buffer = Vec::with_capacity(
-						parameters.iter().fold(0, count_nal_bytes) +
-							frame_buffer.iter().fold(0, count_nal_bytes) +
-							frame.raw_bytes.len()
+						frames.iter()
+							.map(|x| x.raw_bytes.len())
+							.fold(0, |x, y| x + y)
 					);
 
-					for nal in &parameters {
-						buffer.extend(&nal.raw_bytes);
+					for frame in frames {
+						buffer.extend(&frame.raw_bytes);
 					}
-					for nal in &frame_buffer {
-						buffer.extend(&nal.raw_bytes);
-					}
-					buffer.extend(&frame.raw_bytes);
 
 					sock.write_all(&buffer).await
 				} else {
@@ -113,7 +110,7 @@ async fn write_h264_stream(mut producer: Receiver<H264NalUnit>, socks: SocksCont
 
 				if let Err(e) = write {
 					errors.push(addr.to_owned());
-					warn!("Write error {} on {}, disconnecting...",e.description(), addr);
+					warn!("Write error {} on {}, disconnecting...",e.to_string(), addr);
 				}
 			}
 		}
@@ -129,10 +126,6 @@ async fn write_h264_stream(mut producer: Receiver<H264NalUnit>, socks: SocksCont
 
 		frame_buffer.push(frame);
 	}
-}
-
-fn count_nal_bytes(x: usize, nal: &H264NalUnit) -> usize {
-	x + nal.raw_bytes.len()
 }
 
 async fn listen_for_new_sockets(listener: TcpListener, socks: SocksContainer) {
