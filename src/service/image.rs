@@ -69,6 +69,8 @@ async fn handle(ctx: HyperCtx, addr: SocketAddr, req: Request<Body>) -> Result<R
 	if let Ok(output) = child.wait_with_output().await {
 		if output.status.exit_ok().is_err() {
 			error!("Caught an ffmpeg error for {}", addr);
+			tokio::fs::write("ffmpeg.log", output.stderr).await;
+			info!("Error log dumped to ffmpeg.log");
 			return internal_server_error();
 		}
 
