@@ -74,7 +74,7 @@ async fn handle(ctx: HyperCtx, addr: SocketAddr, req: Request<Body>) -> Result<R
 
 		Ok(Response::builder()
 			.status(StatusCode::OK)
-			.header(HeaderName::from_static("Content-Type"), HeaderValue::from_static("image/jpeg"))
+			.header(HeaderName::from_static("content-type"), HeaderValue::from_static("image/jpeg"))
 			.body(Body::from(output.stdout))
 			.unwrap())
 	} else {
