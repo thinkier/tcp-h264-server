@@ -1,6 +1,6 @@
 # ARMv7 cross compiler docker image
 
-FROM rust:latest
+FROM rust:buster
 
 RUN apt-get update && apt-get upgrade -y
 RUN apt-get install -y g++-arm-linux-gnueabihf libc6-dev-armhf-cross
