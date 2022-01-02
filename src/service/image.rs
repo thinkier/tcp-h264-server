@@ -1,62 +1,98 @@
+use std::convert::Infallible;
+use std::net::SocketAddr;
 use std::process::Stdio;
 
-use tokio::io::AsyncWriteExt;
-use tokio::net::{TcpListener, TcpStream};
+use hyper::{Body, Method, Request, Response, StatusCode};
+use hyper::header::HeaderName;
+use hyper::http::HeaderValue;
+use hyper::server::Builder;
+use hyper::server::conn::{AddrIncoming, AddrStream};
+use hyper::service::{make_service_fn, service_fn};
 use tokio::process::Command;
 
 use crate::utils::{SocksContainer, Writable};
 
-pub async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContainer) {
-	// TODO Replace with hyper server
-	while let Ok((mut client, addr)) = listener.accept().await {
-		let socks = socks.clone();
-		tokio::spawn(async move {
-			let addr = addr.to_string();
+#[derive(Clone)]
+struct HyperCtx {
+	socks: SocksContainer,
+}
 
-			info!("Image requested {}", addr);
-			let mut child = Command::new("ffmpeg")
-				.args(&[
-					"-i", "-",
-					"-ss", "0.5",
-					"-vframes", "1",
-					"-f", "image2",
-					"pipe:"
-				])
-				.stdin(Stdio::piped())
-				.stdout(Stdio::piped())
-				.stderr(Stdio::null())
-				.spawn()
-				.unwrap();
+pub async fn listen_for_new_image_requests(server: Builder<AddrIncoming>, socks: SocksContainer) {
+	let ctx = HyperCtx { socks };
 
-			if let Some(stdin) = child.stdin.take() {
-				socks.lock().await.insert(addr.clone(), Writable::ChildStdin(stdin));
-			} else {
-				error!("Failed to obtain stdin of ffmpeg for {}", addr);
-				emit_http_500(client).await;
-				return;
-			}
+	let make_service = make_service_fn(move |conn: &AddrStream| {
+		let ctx = ctx.clone();
+		let addr = conn.remote_addr();
 
-			if let Ok(output) = child.wait_with_output().await {
-				let stdout = output.stdout;
-				let _ = client.write_all(format!("HTTP/1.1 200\r\n\
-				Content-Type: image/jpeg\r\n\
-				Content-Length: {}\r\n\r\n", stdout.len())
-					.as_bytes()).await;
+		async move {
+			Ok::<_, Infallible>(service_fn(move |req| {
+				handle(ctx.clone(), addr, req)
+			}))
+		}
+	});
 
-				let _ = client.write_all(&stdout).await;
-				let _ = client.flush().await;
-				return;
-			} else {
-				error!("Failed to read ffmpeg capture for {}", addr);
-				emit_http_500(client).await;
-				return;
-			}
-		});
+	server
+		.serve(make_service)
+		.await
+		.unwrap();
+}
+
+async fn handle(ctx: HyperCtx, addr: SocketAddr, req: Request<Body>) -> Result<Response<Body>, Infallible> {
+	let addr = addr.to_string();
+
+	if req.method() != Method::GET {
+		return bad_request();
+	}
+
+	info!("Image requested {}", addr);
+	let mut child = Command::new("ffmpeg")
+		.args(&[
+			"-i", "-",
+			"-ss", "0.5",
+			"-vframes", "1",
+			"-f", "image2",
+			"pipe:"
+		])
+		.stdin(Stdio::piped())
+		.stdout(Stdio::piped())
+		.stderr(Stdio::null())
+		.spawn()
+		.unwrap();
+
+	if let Some(stdin) = child.stdin.take() {
+		ctx.socks.lock().await.insert(addr.clone(), Writable::ChildStdin(stdin));
+	} else {
+		error!("Failed to obtain stdin of ffmpeg for {}", addr);
+		return internal_server_error();
+	}
+
+	if let Ok(output) = child.wait_with_output().await {
+		if output.status.exit_ok().is_err() {
+			error!("Caught an ffmpeg error for {}", addr);
+			return internal_server_error();
+		}
+
+		Ok(Response::builder()
+			.status(StatusCode::OK)
+			.header(HeaderName::from_static("Content-Type"), HeaderValue::from_static("image/jpeg"))
+			.body(Body::from(output.stdout))
+			.unwrap())
+	} else {
+		error!("Failed to read ffmpeg capture for {}", addr);
+		internal_server_error()
 	}
 }
 
-async fn emit_http_500(mut client: TcpStream) {
-	let _ = client.write_all(b"HTTP/1.1 500\r\n\
-				Content-Length: 0").await;
-	let _ = client.flush().await;
+fn bad_request() -> Result<Response<Body>, Infallible> {
+	Ok(Response::builder()
+		.status(StatusCode::BAD_REQUEST)
+		.body(Body::empty())
+		.unwrap())
+}
+
+fn internal_server_error() -> Result<Response<Body>, Infallible> {
+	Ok(Response::builder()
+		.status(StatusCode::INTERNAL_SERVER_ERROR)
+		.body(Body::empty())
+		.unwrap())
 }

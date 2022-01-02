@@ -1,6 +1,8 @@
+#![feature(exit_status_error)]
 #[macro_use]
 extern crate argh;
 extern crate env_logger;
+extern crate hyper;
 #[macro_use]
 extern crate log;
 extern crate tokio;

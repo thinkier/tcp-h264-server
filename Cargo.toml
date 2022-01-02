@@ -14,6 +14,10 @@ argh = "^0.1.7"
 log = "^0.4.14"
 env_logger = "^0.9.0"
 
+[dependencies.hyper]
+version = "^0.14.16"
+features = ["server", "tcp", "http1"]
+
 [dependencies.tokio]
 version = "^1.15.0"
 features = ["full"]

@@ -1,5 +1,8 @@
-use std::net::SocketAddrV4;
+use std::net::{SocketAddr, SocketAddrV4};
 
+use hyper::Server;
+use hyper::server::Builder;
+use hyper::server::conn::AddrIncoming;
 use tokio::net::TcpListener;
 
 #[derive(FromArgs)]
@@ -20,18 +23,23 @@ pub struct CliArgs {
 }
 
 impl CliArgs {
-	async fn start_listening(host: &str, port: u16) -> TcpListener {
-		TcpListener::bind(SocketAddrV4::new(
+	fn parse_socket_addr(host: &str, port: u16) -> SocketAddrV4 {
+		SocketAddrV4::new(
 			host.parse().unwrap(),
 			port,
-		)).await.unwrap()
+		)
+	}
+
+	async fn start_listening(host: &str, port: u16) -> TcpListener {
+		TcpListener::bind(Self::parse_socket_addr(host, port)).await.unwrap()
 	}
 
 	pub async fn start_listening_for_video(&self) -> TcpListener {
 		Self::start_listening(&self.video_host, self.video_port).await
 	}
 
-	pub async fn start_listening_for_image(&self) -> TcpListener {
-		Self::start_listening(&self.image_host, self.image_port).await
+	pub async fn start_listening_for_image(&self) -> Builder<AddrIncoming> {
+		let addr = Self::parse_socket_addr(&self.image_host, self.image_port);
+		Server::bind(&SocketAddr::V4(addr))
 	}
 }
