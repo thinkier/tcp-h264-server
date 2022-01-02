@@ -158,6 +158,7 @@ async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContai
 					"-i", "-",
 					"-ss", "0.5",
 					"-vframes", "1",
+					"-f", "image2",
 					"pipe:"
 				])
 				.stdin(Stdio::piped())
@@ -175,7 +176,7 @@ async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContai
 			if let Ok(output) = child.wait_with_output().await {
 				let stdout = output.stdout;
 				let _ = client.write_all(format!("HTTP/1.1 200\r\n\
-				Content-Type: image/png\r\n\
+				Content-Type: image/jpeg\r\n\
 				Content-Length: {}\r\n\r\n", stdout.len())
 					.as_bytes()).await;
 
