@@ -6,5 +6,8 @@
 - [x] Allow multiple concurrent connection
 - [x] Start stream correctly at a convenient position
 
+## Stretch Goals
+- [ ] Snapshot provider (for integration with `homebridge-camera-ffmpeg`), which hooks into `raspicam` or `libcamera-png` when the stream isn't active, or takes a pic from the video stream.
+
 ## Notes
 - Requires the emitter of the H264 stream to have redundant slices (NAL type 0x5) (ie. it must be either `baseline` or `extended` profile)
