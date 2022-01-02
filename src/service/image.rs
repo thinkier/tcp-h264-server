@@ -7,6 +7,7 @@ use tokio::process::Command;
 use crate::utils::{SocksContainer, Writable};
 
 pub async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContainer) {
+	// TODO Replace with hyper server
 	while let Ok((mut client, addr)) = listener.accept().await {
 		let socks = socks.clone();
 		tokio::spawn(async move {
