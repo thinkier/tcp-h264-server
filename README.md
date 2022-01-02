@@ -5,3 +5,6 @@
 ## Goals
 - [ ] Allow multiple concurrent connection
 - [ ] Start stream correctly at a convenient position
+
+## Notes
+- Requires the emitter of the H264 stream to have redundant slices (NAL type 0x5) (ie. it must be either `baseline` or `extended` profile)
