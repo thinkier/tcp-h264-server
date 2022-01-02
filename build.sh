@@ -1,5 +1,3 @@
-#!/bin/sh
-
 if [[ $* ]]; then
   docker build . -t ghcr.io/thinkier/tcp-h264-server-armv7-build
 fi

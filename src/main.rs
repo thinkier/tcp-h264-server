@@ -148,16 +148,10 @@ async fn write_h264_stream(mut producer: Receiver<H264NalUnit>, socks: SocksCont
 }
 
 async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContainer) {
-	while let Ok((client, addr)) = listener.accept().await {
-		let mut client = BufStream::new(client);
+	while let Ok((mut client, addr)) = listener.accept().await {
 		let socks = socks.clone();
 		tokio::spawn(async move {
 			let addr = addr.to_string();
-			{
-				let mut sbuf = String::new();
-				let _ = client.read_line(&mut sbuf).await;
-				info!("{}: {}", addr,sbuf);
-			}
 
 			info!("Image requested {}", addr);
 			let mut child = Command::new("ffmpeg")
@@ -175,8 +169,9 @@ async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContai
 				.unwrap();
 
 			if let Some(stdin) = child.stdin.take() {
-				error!("Failed to obtain stdin of ffmpeg for {}", addr);
 				socks.lock().await.insert(addr.clone(), Writable::ChildStdin(stdin));
+			} else {
+				error!("Failed to obtain stdin of ffmpeg for {}", addr);
 				emit_http_500(client).await;
 				return;
 			}
@@ -199,7 +194,7 @@ async fn listen_for_new_image_requests(listener: TcpListener, socks: SocksContai
 	}
 }
 
-async fn emit_http_500(mut client: BufStream<TcpStream>) {
+async fn emit_http_500(mut client: TcpStream) {
 	let _ = client.write_all(b"HTTP/1.1 500\r\n\
 				Content-Length: 0").await;
 }
