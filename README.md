@@ -12,7 +12,19 @@
 ## Stretch Goals
 
 - [x] Snapshot provider (for integration with `homebridge-camera-ffmpeg`)
-  - [ ] Hook into `raspicam` or `libcamera-png` when the stream isn't active
+    - [ ] Hook into `raspicam` or `libcamera-png` when the stream isn't active
+
+## Sample `homebridge-camera-ffmpeg` configuration
+
+```json
+{
+  "name": "Front Porch",
+  "videoConfig": {
+    "source": "-i tcp://192.168.1.169:1264",
+    "stillImageSource": "-i http://192.168.1.169:8080/"
+  }
+}
+```
 
 ## Notes
 
