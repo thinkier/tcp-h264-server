@@ -11,7 +11,8 @@
 
 ## Stretch Goals
 
-- [ ] Snapshot provider (for integration with `homebridge-camera-ffmpeg`), which hooks into `raspicam` or `libcamera-png` when the stream isn't active, or takes a pic from the video stream.
+- [x] Snapshot provider (for integration with `homebridge-camera-ffmpeg`)
+  - [ ] Hook into `raspicam` or `libcamera-png` when the stream isn't active
 
 ## Notes
 
