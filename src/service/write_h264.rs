@@ -65,6 +65,7 @@ pub async fn write_h264_stream(mut producer: Receiver<H264NalUnit>, socks: Socks
 
 		while let Some(addr) = errors.pop() {
 			socks.lock().await.remove(&addr);
+			info!("Ejected {}", addr);
 		}
 
 		// Drop the buffer if it's too big
