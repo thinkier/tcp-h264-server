@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::process::Stdio;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use hyper::{Body, Method, Request, Response, StatusCode};
 use hyper::header::HeaderName;
@@ -38,9 +39,9 @@ pub async fn listen_for_new_image_requests(server: Builder<AddrIncoming>, socks:
 }
 
 async fn handle(ctx: HyperCtx, addr: SocketAddr, req: Request<Body>) -> Result<Response<Body>, Infallible> {
-	let addr = addr.to_string();
+	let addr = format!("{}@{}", addr, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos());
 
-	if req.method() != Method::GET {
+	if req.method() != Method::GET && req.uri() != "/" {
 		return bad_request();
 	}
 
@@ -48,7 +49,7 @@ async fn handle(ctx: HyperCtx, addr: SocketAddr, req: Request<Body>) -> Result<R
 	let mut child = Command::new("ffmpeg")
 		.args(&[
 			"-i", "-",
-			"-ss", "0.5",
+			"-vf", "select=gte(n\\,5)",
 			"-vframes", "1",
 			"-f", "image2",
 			"pipe:"

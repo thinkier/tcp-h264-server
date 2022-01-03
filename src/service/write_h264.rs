@@ -33,6 +33,8 @@ pub async fn write_h264_stream(mut producer: Receiver<H264NalUnit>, socks: Socks
 		{
 			for (addr, sock) in socks.lock().await.iter_mut() {
 				let write = if !known_socks.contains(addr) {
+					info!("Accepted {}", addr);
+
 					known_socks.insert(addr.to_owned());
 					let mut frames = [&seq_param, &pic_param]
 						.into_iter()
@@ -65,12 +67,14 @@ pub async fn write_h264_stream(mut producer: Receiver<H264NalUnit>, socks: Socks
 
 		while let Some(addr) = errors.pop() {
 			socks.lock().await.remove(&addr);
+			known_socks.remove(&addr);
 			info!("Ejected {}", addr);
 		}
 
 		// Drop the buffer if it's too big
 		if frame_buffer.len() >= FRAME_BUFFER_CAP {
-			frame_buffer.truncate(1);
+			error!("Video buffer overflowed");
+			frame_buffer.clear();
 		}
 
 		frame_buffer.push(frame);
