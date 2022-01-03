@@ -41,7 +41,7 @@ pub async fn listen_for_new_image_requests(server: Builder<AddrIncoming>, socks:
 async fn handle(ctx: HyperCtx, addr: SocketAddr, req: Request<Body>) -> Result<Response<Body>, Infallible> {
 	let addr = format!("{}@{}", addr, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos());
 
-	if req.method() != Method::GET && req.uri() != "/" {
+	if req.method() != Method::GET || req.uri() != "/" {
 		return bad_request();
 	}
 
