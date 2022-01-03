@@ -75,7 +75,7 @@ pub struct H264NalUnit {
 impl H264NalUnit {
 	pub fn new(raw_bytes: Vec<u8>) -> Self {
 		H264NalUnit {
-			// There's 31 possible NAL unit codes for H264
+			// There's 32 possible NAL unit codes for H264
 			unit_code: 0x1f & raw_bytes[3],
 			raw_bytes,
 		}
