@@ -12,15 +12,15 @@ use std::collections::HashMap;
 use log::LevelFilter;
 use tokio::sync::mpsc;
 
-use crate::cli::CliArgs;
+use crate::model::cli::CliArgs;
 use crate::service::image::listen_for_new_image_requests;
 use crate::service::read_h264::read_h264_stream;
 use crate::service::video::listen_for_new_video_sockets;
 use crate::service::write_h264::write_h264_stream;
 use crate::utils::am;
 
-mod cli;
-mod h264;
+mod model;
+mod implem;
 mod service;
 mod utils;
 

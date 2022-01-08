@@ -3,9 +3,9 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::time::interval;
 
-use crate::utils::{SocksContainer, Writable};
+use crate::utils::{StreamsContainer, Writable};
 
-pub async fn listen_for_new_video_sockets(listener: TcpListener, socks: SocksContainer) {
+pub async fn listen_for_new_video_sockets(listener: TcpListener, socks: StreamsContainer) {
 	while let Ok((client, addr)) = listener.accept().await {
 		let addr = addr.to_string();
 		info!("Streaming to {}", addr);

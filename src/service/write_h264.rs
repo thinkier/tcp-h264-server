@@ -2,12 +2,12 @@ use std::collections::HashSet;
 
 use tokio::sync::mpsc::Receiver;
 
-use crate::h264::H264NalUnit;
-use crate::utils::SocksContainer;
+use crate::model::h264::H264NalUnit;
+use crate::utils::StreamsContainer;
 
 const FRAME_BUFFER_CAP: usize = 1000;
 
-pub async fn write_h264_stream(mut producer: Receiver<H264NalUnit>, socks: SocksContainer) {
+pub async fn write_h264_stream(mut producer: Receiver<H264NalUnit>, socks: StreamsContainer) {
 	let mut seq_param: Option<H264NalUnit> = None;
 	let mut pic_param: Option<H264NalUnit> = None;
 

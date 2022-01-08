@@ -5,13 +5,15 @@ use tokio::io::{AsyncWriteExt, Result as IoResult};
 use tokio::net::TcpStream;
 use tokio::process::ChildStdin;
 use tokio::sync::Mutex;
+use tokio::time::Instant;
 
 pub type Am<T> = Arc<Mutex<T>>;
-pub type SocksContainer = Am<HashMap<String, Writable>>;
+pub type StreamsContainer = Am<HashMap<String, Writable>>;
 
 pub enum Writable {
 	TcpStream(TcpStream),
 	ChildStdin(ChildStdin),
+	Monitor(Am<Instant>),
 }
 
 impl Writable {
@@ -19,6 +21,14 @@ impl Writable {
 		match self {
 			Writable::TcpStream(x) => x.write_all(buf).await,
 			Writable::ChildStdin(x) => x.write_all(buf).await,
+			Writable::Monitor(x) => Ok(*x.lock().await = Instant::now())
+		}
+	}
+
+	pub fn is_output(x: &&Self) -> bool {
+		match *x {
+			Writable::Monitor(_) => false,
+			_ => true
 		}
 	}
 }

@@ -1,7 +1,7 @@
 use tokio::io::stdin;
 use tokio::sync::mpsc::Sender;
 
-use crate::h264::{H264NalUnit, H264Stream};
+use crate::model::h264::{H264NalUnit, H264Stream};
 
 pub async fn read_h264_stream(consumer: Sender<H264NalUnit>) {
 	let mut stream = H264Stream::new(stdin());

@@ -11,14 +11,14 @@ use hyper::server::conn::{AddrIncoming, AddrStream};
 use hyper::service::{make_service_fn, service_fn};
 use tokio::process::Command;
 
-use crate::utils::{SocksContainer, Writable};
+use crate::utils::{StreamsContainer, Writable};
 
 #[derive(Clone)]
 struct HyperCtx {
-	socks: SocksContainer,
+	socks: StreamsContainer,
 }
 
-pub async fn listen_for_new_image_requests(server: Builder<AddrIncoming>, socks: SocksContainer) {
+pub async fn listen_for_new_image_requests(server: Builder<AddrIncoming>, socks: StreamsContainer) {
 	let ctx = HyperCtx { socks };
 
 	let make_service = make_service_fn(move |conn: &AddrStream| {
