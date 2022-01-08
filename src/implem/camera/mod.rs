@@ -10,7 +10,6 @@ pub mod image;
 pub mod settings;
 pub mod video;
 
-#[derive(PartialEq)]
 pub enum Mode {
 	Image,
 	Video,
@@ -27,13 +26,13 @@ impl From<(CameraProvider, Mode)> for CameraArgs {
 		let mut args = [
 			"-o", "-", // Emit to stdout
 			"-n", // No output window
-			"-t", "0" // Don't timeout
 		].into_iter()
 			.map(str::to_string)
 			.collect::<Vec<_>>();
 
-		if m == Mode::Image {
-			args.extend(["--encoding", "bmp"].into_iter().map(str::to_string))
+		match m {
+			Mode::Image => args.extend(["--encoding", "bmp"].into_iter().map(str::to_string)),
+			Mode::Video => args.extend(["-t", "0"].into_iter().map(str::to_string)),
 		}
 
 		CameraArgs {

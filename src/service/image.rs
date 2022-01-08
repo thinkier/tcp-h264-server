@@ -1,7 +1,5 @@
 use std::convert::Infallible;
 use std::net::SocketAddr;
-use std::process::Stdio;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use hyper::{Body, Method, Request, Response, StatusCode};
 use hyper::header::HeaderName;
@@ -9,17 +7,16 @@ use hyper::http::HeaderValue;
 use hyper::server::Builder;
 use hyper::server::conn::{AddrIncoming, AddrStream};
 use hyper::service::{make_service_fn, service_fn};
-use tokio::process::Command;
 
-use crate::utils::{StreamsContainer, Writable};
+use crate::ImageWrapper;
 
 #[derive(Clone)]
 struct HyperCtx {
-	socks: StreamsContainer,
+	iw: ImageWrapper,
 }
 
-pub async fn listen_for_new_image_requests(server: Builder<AddrIncoming>, socks: StreamsContainer) {
-	let ctx = HyperCtx { socks };
+pub async fn listen_for_new_image_requests(server: Builder<AddrIncoming>, iw: ImageWrapper) {
+	let ctx = HyperCtx { iw };
 
 	let make_service = make_service_fn(move |conn: &AddrStream| {
 		let ctx = ctx.clone();
@@ -39,44 +36,16 @@ pub async fn listen_for_new_image_requests(server: Builder<AddrIncoming>, socks:
 }
 
 async fn handle(ctx: HyperCtx, addr: SocketAddr, req: Request<Body>) -> Result<Response<Body>, Infallible> {
-	let addr = format!("{}@{}", addr, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos());
-
 	if req.method() != Method::GET || req.uri() != "/" {
 		return bad_request();
 	}
 
-	info!("Image requested {}", addr);
-	let mut child = Command::new("ffmpeg")
-		.args(&[
-			"-i", "-",
-			"-vf", "select=gte(n\\,5)",
-			"-vframes", "1",
-			"-f", "image2",
-			"pipe:"
-		])
-		.stdin(Stdio::piped())
-		.stdout(Stdio::piped())
-		.stderr(Stdio::null())
-		.spawn()
-		.unwrap();
-
-	if let Some(stdin) = child.stdin.take() {
-		ctx.socks.lock().await.insert(addr.clone(), Writable::ChildStdin(stdin));
-	} else {
-		error!("Failed to obtain stdin of ffmpeg for {}", addr);
-		return internal_server_error();
-	}
-
-	if let Ok(output) = child.wait_with_output().await {
-		Ok(Response::builder()
-			.status(StatusCode::OK)
-			.header(HeaderName::from_static("content-type"), HeaderValue::from_static("image/jpeg"))
-			.body(Body::from(output.stdout))
-			.unwrap())
-	} else {
-		error!("Failed to read ffmpeg capture for {}", addr);
-		internal_server_error()
-	}
+	let (bytes, content_type) = ctx.iw.take_snapshot(format!("[snapshot {}]", addr)).await;
+	Ok(Response::builder()
+		.status(StatusCode::OK)
+		.header(HeaderName::from_static("content-type"), HeaderValue::from_static(content_type))
+		.body(Body::from(bytes))
+		.unwrap())
 }
 
 fn bad_request() -> Result<Response<Body>, Infallible> {

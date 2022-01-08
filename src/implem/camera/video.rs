@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
@@ -109,6 +108,7 @@ impl VideoManager {
 
 #[derive(Clone)]
 pub struct VideoWrapper {
+	mon: Am<Option<Instant>>,
 	handle: Am<JoinHandle<()>>,
 	streams: StreamsContainer,
 }
@@ -123,10 +123,10 @@ impl VideoWrapper {
 
 		let handle = {
 			let streams = streams.clone();
+			let mon = mon.clone();
 
 			tokio::spawn(async move {
-				let mut int = interval(Duration::from_millis(500));
-
+				let mut int = interval(Duration::from_millis(50));
 
 				loop {
 					int.tick().await;
@@ -145,6 +145,7 @@ impl VideoWrapper {
 					} {
 						// Perform cleanup for childless exit
 						vm.destroy().await;
+						*mon.lock().await = Some(Instant::now());
 					}
 
 					{
@@ -167,9 +168,17 @@ impl VideoWrapper {
 		};
 
 		return VideoWrapper {
+			mon,
 			handle: am(handle),
 			streams,
 		};
+	}
+
+	pub async fn is_active(&self) -> bool {
+		self.streams.lock().await
+			.values()
+			.filter(Writable::is_output)
+			.count() > 0
 	}
 
 	pub async fn register(&self, addr: String, w: Writable) {
