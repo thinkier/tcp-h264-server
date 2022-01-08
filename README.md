@@ -14,9 +14,9 @@ aren't possible with `raspivid` and `libcamera-vid` alone.
 ## Stretch Goals
 
 - [x] Snapshot provider (for integration with `homebridge-camera-ffmpeg`)
-    - [ ] Hook into `raspicam` or `libcamera-png` when the stream isn't active
-- [ ] Host the `raspicam` / `libcamera-vid` process
-  - [ ] Automatically restart the process (my CSI cable is 2m+ long and drops out sporadically :/)
+    - [x] ~~Hook into `raspicam` or `libcamera-png` when the stream isn't active~~ Abandoned due to extreme latency
+- [x] Host the `raspicam` / `libcamera-vid` process
+  - [x] Automatically restart the process (my CSI cable is 2m+ long and drops out sporadically :/)
 - [ ] Adjust exposure automatically
 
 ## Sample `homebridge-camera-ffmpeg` configuration
