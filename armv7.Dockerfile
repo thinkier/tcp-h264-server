@@ -5,9 +5,8 @@ FROM rust:buster
 RUN apt-get update && apt-get upgrade -y
 RUN apt-get install -y g++-arm-linux-gnueabihf libc6-dev-armhf-cross
 
-RUN rustup target add armv7-unknown-linux-gnueabihf
-RUN rustup toolchain install nightly-armv7-unknown-linux-gnueabihf
 RUN rustup default nightly
+RUN rustup target add armv7-unknown-linux-gnueabihf
 RUN rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
 
 WORKDIR /app

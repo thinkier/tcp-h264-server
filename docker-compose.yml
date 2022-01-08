@@ -1,0 +1,8 @@
+version: '2'
+services:
+  armv7:
+    image: ghcr.io/thinkier/tcp-h264-server-armv7-build:latest
+    build: ./armv7.Dockerfile
+    volumes:
+      - .:/app
+    restart: 'no'
