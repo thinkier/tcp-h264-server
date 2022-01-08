@@ -19,12 +19,9 @@ pub struct CliArgs {
 	#[argh(option, short = 'c', default = "Default::default()")]
 	/// the camera stack to use (available options: "legacy" (alias "raspi"), "libcamera") (default: "legacy")
 	pub camera_provider: CameraProvider,
-	#[argh(option, short = 'v', default = "Default::default()")]
-	/// the video resolution specified in units of pixel in the form of WxH (default: 1280x720)
-	pub video_resolution: Resolution,
-	#[argh(option, short = 'i', default = "Default::default()")]
-	/// the image resolution specified in units of pixel in the form of WxH (default: 1280x720)
-	pub image_resolution: Resolution,
+	#[argh(option, short = 's', default = "Default::default()")]
+	/// the resolution specified in units of pixel in the form of WxH (default: 1280x720)
+	pub resolution: Resolution,
 	#[argh(option, short = 'r', default = "Default::default()")]
 	/// the number of degrees the camera is offset by (available options: 0, 180 (90, 270 only available for legacy camera stack)) (default: 0)
 	pub rotation: Rotation,

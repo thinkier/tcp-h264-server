@@ -40,10 +40,10 @@ async fn handle(ctx: HyperCtx, addr: SocketAddr, req: Request<Body>) -> Result<R
 		return bad_request();
 	}
 
-	let (bytes, content_type) = ctx.iw.take_snapshot(format!("[snapshot {}]", addr)).await;
+	let bytes= ctx.iw.take_snapshot_from_video(format!("[snapshot {}]", addr)).await;
 	Ok(Response::builder()
 		.status(StatusCode::OK)
-		.header(HeaderName::from_static("content-type"), HeaderValue::from_static(content_type))
+		.header(HeaderName::from_static("content-type"), HeaderValue::from_static("image/jpeg"))
 		.body(Body::from(bytes))
 		.unwrap())
 }
@@ -51,13 +51,6 @@ async fn handle(ctx: HyperCtx, addr: SocketAddr, req: Request<Body>) -> Result<R
 fn bad_request() -> Result<Response<Body>, Infallible> {
 	Ok(Response::builder()
 		.status(StatusCode::BAD_REQUEST)
-		.body(Body::empty())
-		.unwrap())
-}
-
-fn internal_server_error() -> Result<Response<Body>, Infallible> {
-	Ok(Response::builder()
-		.status(StatusCode::INTERNAL_SERVER_ERROR)
 		.body(Body::empty())
 		.unwrap())
 }

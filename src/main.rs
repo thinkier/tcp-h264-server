@@ -31,15 +31,11 @@ async fn main() {
 		.init();
 
 	let mut vargs = CameraArgs::from((args.camera_provider, Mode::Video));
-	vargs.with_resolution(args.video_resolution)
-		.with_rotation(args.rotation);
-
-	let mut iargs = CameraArgs::from((args.camera_provider, Mode::Image));
-	iargs.with_resolution(args.image_resolution)
+	vargs.with_resolution(args.resolution)
 		.with_rotation(args.rotation);
 
 	let vw = VideoWrapper::create(vargs).await;
-	let iw = ImageWrapper::create(iargs, vw.clone());
+	let iw = ImageWrapper::create(vw.clone());
 
 	let img = args.start_listening_for_image().await;
 	tokio::spawn(listen_for_new_image_requests(img, iw));
