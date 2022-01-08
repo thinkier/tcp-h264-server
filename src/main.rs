@@ -11,12 +11,12 @@ use std::collections::HashMap;
 
 use log::LevelFilter;
 use tokio::sync::mpsc;
+use crate::implem::camera::{CameraArgs, Mode};
+use crate::implem::camera::video::VideoWrapper;
 
 use crate::model::cli::CliArgs;
 use crate::service::image::listen_for_new_image_requests;
-use crate::service::read_h264::read_h264_stream;
 use crate::service::video::listen_for_new_video_sockets;
-use crate::service::write_h264::write_h264_stream;
 use crate::utils::am;
 
 mod model;
@@ -32,15 +32,16 @@ async fn main() {
 		.filter_level(LevelFilter::Info)
 		.init();
 
-	let (tx, rx) = mpsc::channel(60);
-	let socks = am(HashMap::new());
-	tokio::spawn(read_h264_stream(tx));
-	tokio::spawn(write_h264_stream(rx, socks.clone()));
+	let mut vargs = CameraArgs::from((args.camera_provider, Mode::Video));
+	vargs.with_resolution(args.video_resolution)
+		.with_rotation(args.rotation);
 
-	let img = args.start_listening_for_image().await;
-	tokio::spawn(listen_for_new_image_requests(img, socks.clone()));
+	let vw = VideoWrapper::create(vargs).await;
+
+	// let img = args.start_listening_for_image().await;
+	// tokio::spawn(listen_for_new_image_requests(img, socks.clone()));
 
 	let vid = args.start_listening_for_video().await;
-	listen_for_new_video_sockets(vid, socks).await;
+	listen_for_new_video_sockets(vid, vw).await;
 }
 

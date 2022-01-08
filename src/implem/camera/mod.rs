@@ -24,7 +24,11 @@ pub struct CameraArgs {
 
 impl From<(CameraProvider, Mode)> for CameraArgs {
 	fn from((p, m): (CameraProvider, Mode)) -> Self {
-		let mut args = ["-o", "-"].into_iter()
+		let mut args = [
+			"-o", "-", // Emit to stdout
+			"-n", // No output window
+			"-t", "0" // Don't timeout
+		].into_iter()
 			.map(str::to_string)
 			.collect::<Vec<_>>();
 
@@ -35,9 +39,9 @@ impl From<(CameraProvider, Mode)> for CameraArgs {
 		CameraArgs {
 			cmd: match (p, m) {
 				(CameraProvider::Legacy, Mode::Image) => "raspistill",
-				(CameraProvider::LibCamera, Mode::Image) => "raspivid",
-				(CameraProvider::Legacy, Mode::Video) => "libcamera-vid",
-				(CameraProvider::LibCamera, Mode::Video) => "libcamera-still"
+				(CameraProvider::LibCamera, Mode::Image) => "libcamera-still",
+				(CameraProvider::Legacy, Mode::Video) => "raspivid",
+				(CameraProvider::LibCamera, Mode::Video) => "libcamera-vid"
 			},
 			args,
 		}
@@ -45,7 +49,7 @@ impl From<(CameraProvider, Mode)> for CameraArgs {
 }
 
 impl CameraArgs {
-	pub fn with_resolution(&mut self, res: &Resolution) -> &mut Self {
+	pub fn with_resolution(&mut self, res: Resolution) -> &mut Self {
 		self.args.push("--width".to_string());
 		self.args.push(res.width.to_string());
 		self.args.push("--height".to_string());
@@ -54,7 +58,7 @@ impl CameraArgs {
 		return self;
 	}
 
-	pub fn with_rotation(&mut self, rot: &Rotation) -> &mut Self {
+	pub fn with_rotation(&mut self, rot: Rotation) -> &mut Self {
 		let args = match rot {
 			Rotation::Clockwise90 => ["--rotation", "90"],
 			Rotation::UpsideDown => ["--hflip", "--vflip"],
@@ -67,7 +71,7 @@ impl CameraArgs {
 		return self;
 	}
 
-	pub fn with_shutter_speed(&mut self, duration: &Duration) -> &mut Self {
+	pub fn with_shutter_speed(&mut self, duration: Duration) -> &mut Self {
 		self.args.push("--shutter".to_string());
 		self.args.push(duration.as_micros().to_string());
 

@@ -13,7 +13,7 @@ pub type StreamsContainer = Am<HashMap<String, Writable>>;
 pub enum Writable {
 	TcpStream(TcpStream),
 	ChildStdin(ChildStdin),
-	Monitor(Am<Instant>),
+	Monitor(Am<Option<Instant>>),
 }
 
 impl Writable {
@@ -21,7 +21,7 @@ impl Writable {
 		match self {
 			Writable::TcpStream(x) => x.write_all(buf).await,
 			Writable::ChildStdin(x) => x.write_all(buf).await,
-			Writable::Monitor(x) => Ok(*x.lock().await = Instant::now())
+			Writable::Monitor(x) => Ok(*x.lock().await = Some(Instant::now()))
 		}
 	}
 

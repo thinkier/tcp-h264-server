@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
@@ -53,6 +54,12 @@ impl VideoManager {
 				{
 					let mut streams = streams.lock().await;
 					if streams.values().filter(Writable::is_output).count() == 0 {
+						info!("Destroying video session: no clients.");
+						for i in streams.values() {
+							if let Writable::Monitor(ref i) = i {
+								*i.lock().await = None;
+							}
+						}
 						return;
 					}
 
@@ -60,6 +67,7 @@ impl VideoManager {
 						let w = if known_addrs.contains(k) {
 							w.write_all(&nal.raw_bytes).await
 						} else {
+							info!("Connected {}",k);
 							known_addrs.insert(k.to_string());
 							let mut buf = vec![];
 
@@ -83,9 +91,10 @@ impl VideoManager {
 					}
 					frame_buffer.push(nal);
 
-					for i in write_err.into_iter().rev() {
-						streams.remove(&i);
-						known_addrs.remove(&i);
+					for k in write_err.into_iter().rev() {
+						streams.remove(&k);
+						known_addrs.remove(&k);
+						info!("Disconnected {}",k);
 					}
 				}
 			}
@@ -98,8 +107,9 @@ impl VideoManager {
 	}
 }
 
+#[derive(Clone)]
 pub struct VideoWrapper {
-	handle: JoinHandle<()>,
+	handle: Am<JoinHandle<()>>,
 	streams: StreamsContainer,
 }
 
@@ -107,8 +117,8 @@ impl VideoWrapper {
 	pub async fn create(args: CameraArgs) -> Self {
 		let video_manager: Am<Option<VideoManager>> = am(None);
 		let mut streams = HashMap::new();
-		let mon = am(Instant::now());
-		streams.insert("monitor".to_string(), Writable::Monitor(Arc::clone(&mon)));
+		let mon = am(Some(Instant::now()));
+		streams.insert("[internal monitor]".to_string(), Writable::Monitor(Arc::clone(&mon)));
 		let streams = am(streams);
 
 		let handle = {
@@ -120,36 +130,46 @@ impl VideoWrapper {
 
 				loop {
 					int.tick().await;
-					let elapsed = {
-						Instant::now().duration_since(mon.lock().await.clone())
-					};
-					if elapsed.as_secs() > 10 {
-						if let Some(vm) = {
-							video_manager.lock().await.take()
-						} {
-							vm.destroy().await;
+					if let Some(i) = { mon.lock().await.clone() } {
+						let elapsed = Instant::now().duration_since(i);
+						if elapsed.as_secs() > 10 {
+							if let Some(vm) = {
+								video_manager.lock().await.take()
+							} {
+								info!("Destroying video session: timeout.");
+								vm.destroy().await;
+							}
 						}
+					} else if let Some(vm) = {
+						video_manager.lock().await.take()
+					} {
+						// Perform cleanup for childless exit
+						vm.destroy().await;
 					}
 
 					{
-						if {
+						if { video_manager.lock().await.is_none() } && {
 							streams.lock().await
 								.values()
 								.filter(Writable::is_output)
 								.count() > 0
 						} {
+							info!("Spawning new video session.");
 							{
 								let vm = VideoManager::new(args.clone(), streams.clone()).await;
 								*video_manager.lock().await = Some(vm);
 							}
-							*mon.lock().await = Instant::now();
+							*mon.lock().await = Some(Instant::now());
 						}
 					}
 				}
 			})
 		};
 
-		return VideoWrapper { handle, streams };
+		return VideoWrapper {
+			handle: am(handle),
+			streams,
+		};
 	}
 
 	pub async fn register(&self, addr: String, w: Writable) {
