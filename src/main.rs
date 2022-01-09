@@ -2,6 +2,7 @@
 #[macro_use]
 extern crate argh;
 extern crate env_logger;
+extern crate h264_nal_paging;
 extern crate hyper;
 #[macro_use]
 extern crate log;
