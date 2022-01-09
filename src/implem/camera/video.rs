@@ -122,7 +122,8 @@ impl VideoWrapper {
 					int.tick().await;
 
 					let elapsed = {
-						Instant::now().duration_since(mon.lock().await.clone())
+						let earlier = { mon.lock().await.clone() };
+						Instant::now().duration_since(earlier)
 					};
 					if elapsed.as_secs() > 1 {
 						if let Some(vm) = {
