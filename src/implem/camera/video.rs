@@ -1,8 +1,7 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 use std::time::Duration;
-use h264_nal_paging::{H264NalUnit, H264Stream};
 
+use h264_nal_paging::{H264NalUnit, H264Stream};
 use tokio::process::Child;
 use tokio::task::JoinHandle;
 use tokio::time::{Instant, interval};
@@ -22,7 +21,7 @@ impl VideoManager {
 		self.child.kill().await.unwrap();
 	}
 
-	pub async fn new(args: CameraArgs, streams: StreamsContainer) -> Self {
+	pub async fn new(args: CameraArgs, streams: StreamsContainer, mon: Am<Instant>) -> Self {
 		let mut child = args.spawn().unwrap();
 		let stdout = child.stdout.take().unwrap();
 
@@ -35,6 +34,10 @@ impl VideoManager {
 
 		let task_handle = tokio::spawn(async move {
 			while let Ok(nal) = stream.next().await {
+				{
+					*mon.lock().await = Instant::now();
+				}
+
 				match nal.unit_code {
 					7 => {
 						seq_param = Some(nal);
@@ -106,10 +109,8 @@ pub struct VideoWrapper {
 impl VideoWrapper {
 	pub async fn create(args: CameraArgs) -> Self {
 		let video_manager: Am<Option<VideoManager>> = am(None);
-		let mut streams = HashMap::new();
+		let streams = am(HashMap::new());
 		let mon = am(Instant::now());
-		streams.insert("[internal monitor]".to_string(), Writable::Monitor(Arc::clone(&mon)));
-		let streams = am(streams);
 
 		let handle = {
 			let streams = streams.clone();
@@ -122,7 +123,7 @@ impl VideoWrapper {
 					int.tick().await;
 
 					let elapsed = {
-						let earlier = { mon.lock().await.clone() };
+						let earlier = { Instant::clone(&*mon.lock().await) };
 						Instant::now().duration_since(earlier)
 					};
 					if elapsed.as_secs() > 1 {
@@ -136,17 +137,20 @@ impl VideoWrapper {
 
 					{
 						if { video_manager.lock().await.is_none() } && {
-							streams.lock().await
-								.values()
-								.filter(Writable::is_output)
-								.count() > 0
+							streams.lock().await.len() > 0
 						} {
 							info!("Spawning new video session.");
 							{
-								let vm = VideoManager::new(args.clone(), streams.clone()).await;
+								let vm = VideoManager::new(
+									args.clone(),
+									streams.clone(),
+									mon.clone(),
+								).await;
 								*video_manager.lock().await = Some(vm);
 							}
-							*mon.lock().await = Instant::now();
+							{
+								*mon.lock().await = Instant::now();
+							}
 						}
 					}
 				}
