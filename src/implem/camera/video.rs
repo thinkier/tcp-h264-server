@@ -40,10 +40,12 @@ impl VideoManager {
 
 				match nal.unit_code {
 					7 => {
+						debug!("Writing Sequence Parameters {:?}", nal.raw_bytes);
 						seq_param = Some(nal);
 						continue;
 					}
 					8 => {
+						debug!("Writing Picture Parameters {:?}", nal.raw_bytes);
 						pic_param = Some(nal);
 						continue;
 					}

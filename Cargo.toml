@@ -1,6 +1,6 @@
 [package]
 name = "tcp-h264-server"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -13,7 +13,7 @@ path = "src/main.rs"
 argh = "^0.1.7"
 log = "^0.4.14"
 env_logger = "^0.9.0"
-h264_nal_paging = "^0.1"
+h264_nal_paging = "^0.1.7"
 
 [dependencies.hyper]
 version = "^0.14.16"

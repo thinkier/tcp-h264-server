@@ -28,7 +28,7 @@ async fn main() {
 	let args = argh::from_env::<CliArgs>();
 
 	env_logger::builder()
-		.filter_level(LevelFilter::Info)
+		.filter_level(LevelFilter::Debug)
 		.init();
 
 	let mut vargs = CameraArgs::from((args.camera_provider, Mode::Video));
