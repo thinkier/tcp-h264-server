@@ -22,6 +22,9 @@ pub struct CliArgs {
 	#[argh(option, short = 's', default = "Default::default()")]
 	/// the resolution specified in units of pixel in the form of WxH (default: 1280x720)
 	pub resolution: Resolution,
+	#[argh(option, short = 'f', default = "30")]
+	/// the framerate at which to record the footage (default: 30)
+	pub framerate: u8,
 	#[argh(option, short = 'r', default = "Default::default()")]
 	/// the number of degrees the camera is offset by (available options: 0, 180 (90, 270 only available for legacy camera stack)) (default: 0)
 	pub rotation: Rotation,

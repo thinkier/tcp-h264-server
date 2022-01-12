@@ -33,7 +33,8 @@ async fn main() {
 
 	let mut vargs = CameraArgs::from((args.camera_provider, Mode::Video));
 	vargs.with_resolution(args.resolution)
-		.with_rotation(args.rotation);
+		.with_rotation(args.rotation)
+		.with_framerate(args.framerate);
 
 	let vw = VideoWrapper::create(vargs).await;
 	let iw = ImageWrapper::create(vw.clone());

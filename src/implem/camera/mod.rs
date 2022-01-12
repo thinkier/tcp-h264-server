@@ -70,6 +70,13 @@ impl CameraArgs {
 		return self;
 	}
 
+	pub fn with_framerate(&mut self, fps: u8) -> &mut Self {
+		self.args.push("--framerate".to_string());
+		self.args.push(fps.to_string());
+
+		return self;
+	}
+
 	pub fn with_shutter_speed(&mut self, duration: Duration) -> &mut Self {
 		self.args.push("--shutter".to_string());
 		self.args.push(duration.as_micros().to_string());

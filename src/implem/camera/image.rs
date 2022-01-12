@@ -21,7 +21,6 @@ impl ImageWrapper {
 		let mut child = Command::new("ffmpeg")
 			.args(&[
 				"-i", "-",
-				"-vf", "select=gte(n\\,5)",
 				"-vframes", "1",
 				"-f", "image2",
 				"pipe:"
