@@ -30,6 +30,7 @@ impl VideoManager {
 
 		let mut seq_param: Option<H264NalUnit> = None;
 		let mut pic_param: Option<H264NalUnit> = None;
+		let mut frame_buffer: Vec<H264NalUnit> = Vec::with_capacity(100);
 
 		let task_handle = tokio::spawn(async move {
 			while let Ok(nal) = stream.next().await {
@@ -37,57 +38,55 @@ impl VideoManager {
 					*mon.lock().await = Instant::now();
 				}
 
+				match nal.unit_code {
+					7 => {
+						seq_param = Some(nal);
+						continue;
+					}
+					8 => {
+						pic_param = Some(nal);
+						continue;
+					}
+					5 => frame_buffer.clear(),
+					_ => {}
+				}
+
+				let mut write_err = Vec::with_capacity(0);
+
 				{
 					let mut streams = streams.lock().await;
-					let mut write_err = Vec::with_capacity(0);
+					for (k, w) in streams.iter_mut() {
+						let w = if known_addrs.contains(k) {
+							w.write_all(&nal.raw_bytes).await
+						} else {
+							info!("Connected {}",k);
+							known_addrs.insert(k.to_string());
+							let mut buf = vec![];
 
-					match nal.unit_code {
-						7 => {
-							debug!("Writing Sequence Parameters {:?}",  nal.raw_bytes);
-							seq_param = Some(nal);
-							continue;
-						}
-						8 => {
-							debug!("Writing Picture Parameters {:?}",  nal.raw_bytes);
-							pic_param = Some(nal);
-							continue;
-						}
-						// Full frame if you get my drift
-						5 => {
-							for (k, w) in streams.iter_mut()
-								.filter(|(k, _)| !known_addrs.contains(*k))
-								.collect::<Vec<_>>() {
-								info!("Connected {}", k);
+							[&seq_param, &pic_param]
+								.into_iter()
+								.for_each(|x| x
+									.iter()
+									.map(|p| &p.raw_bytes)
+									.for_each(|p| buf.extend(p)));
+							buf.extend(frame_buffer.iter()
+								.map(|p| &p.raw_bytes)
+								.flat_map(|x| x));
+							buf.extend(&nal.raw_bytes);
 
-								known_addrs.insert(k.to_string());
-								let mut buf = vec![];
+							w.write_all(&buf).await
+						};
 
-								[&seq_param, &pic_param]
-									.into_iter()
-									.for_each(|x| x
-										.iter()
-										.map(|p| &p.raw_bytes)
-										.for_each(|p| buf.extend(p)));
-								buf.extend(&nal.raw_bytes);
-
-								if w.write_all(&buf).await.is_err() {
-									write_err.push(k.clone());
-								}
-							}
-						}
-						_ => {}
-					}
-
-					for (k, w) in streams.iter_mut().filter(|(k, _)| known_addrs.contains(*k)) {
-						if w.write_all(&nal.raw_bytes).await.is_err() {
+						if w.is_err() {
 							write_err.push(k.clone());
 						}
 					}
+					frame_buffer.push(nal);
 
 					for k in write_err.into_iter().rev() {
 						streams.remove(&k);
 						known_addrs.remove(&k);
-						info!("Disconnected {}", k);
+						info!("Disconnected {}",k);
 					}
 				}
 			}
@@ -102,7 +101,6 @@ impl VideoManager {
 
 #[derive(Clone)]
 pub struct VideoWrapper {
-	mon: Am<Instant>,
 	handle: Am<JoinHandle<()>>,
 	streams: StreamsContainer,
 }
@@ -115,7 +113,6 @@ impl VideoWrapper {
 
 		let handle = {
 			let streams = streams.clone();
-			let mon = mon.clone();
 
 			tokio::spawn(async move {
 				let mut int = interval(Duration::from_millis(50));
@@ -159,7 +156,6 @@ impl VideoWrapper {
 		};
 
 		return VideoWrapper {
-			mon,
 			handle: am(handle),
 			streams,
 		};
