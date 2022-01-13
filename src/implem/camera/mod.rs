@@ -26,13 +26,23 @@ impl From<(CameraProvider, Mode)> for CameraArgs {
 		let mut args = [
 			"-o", "-", // Emit to stdout
 			"-n", // No output window
+			"--profile", "baseline" // Baseline ffmpeg profile
 		].into_iter()
 			.map(str::to_string)
 			.collect::<Vec<_>>();
 
 		match m {
 			Mode::Image => args.extend(["--encoding", "bmp"].into_iter().map(str::to_string)),
-			Mode::Video => args.extend(["-t", "0"].into_iter().map(str::to_string)),
+			Mode::Video => {
+				args.extend([
+					"-t", "0", // Don't timeout
+					// Include SPS Timings and other metadata
+					match p {
+						CameraProvider::Legacy => "--spstimings",
+						CameraProvider::LibCamera => "--inline"
+					}
+				].into_iter().map(str::to_string))
+			}
 		}
 
 		CameraArgs {
