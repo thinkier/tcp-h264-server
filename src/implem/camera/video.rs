@@ -35,10 +35,6 @@ impl VideoManager {
 
 		let task_handle = tokio::spawn(async move {
 			while let Ok(nal) = stream.next().await {
-				{
-					*mon.lock().await = Instant::now();
-				}
-
 				match nal.unit_code {
 					7 => {
 						seq_param = Some(nal);
@@ -49,6 +45,7 @@ impl VideoManager {
 						continue;
 					}
 					5 => frame_buffer.clear(),
+					1 => *mon.lock().await = Instant::now(),
 					_ => {}
 				}
 
