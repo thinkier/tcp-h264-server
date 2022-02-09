@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
+use std::process;
 use std::time::Duration;
 
 use h264_nal_paging::{H264NalUnit, H264Stream};
-use tokio::process::Child;
+use tokio::process::{Child, Command};
 use tokio::task::JoinHandle;
 use tokio::time::{Instant, interval};
 
@@ -113,6 +114,31 @@ impl VideoWrapper {
 
 		let handle = {
 			let streams = streams.clone();
+
+			{
+				let mon = mon.clone();
+				tokio::spawn(async move {
+					let mut int = interval(Duration::from_millis(500));
+					loop {
+						int.tick().await;
+
+						let elapsed = {
+							let earlier = { Instant::clone(&*mon.lock().await) };
+							Instant::now().duration_since(earlier).as_secs()
+						};
+						if elapsed > 30 {
+							error!("Timeout on restarting video session.");
+							Command::new("sudo")
+								.arg("reboot")
+								.spawn()
+								.unwrap();
+
+							int.tick().await;
+							process::exit(1);
+						}
+					}
+				});
+			}
 
 			tokio::spawn(async move {
 				let mut int = interval(Duration::from_millis(50));
