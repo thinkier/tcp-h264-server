@@ -5,7 +5,7 @@ use std::time::Duration;
 use h264_nal_paging::{H264NalUnit, H264Stream};
 use tokio::process::{Child, Command};
 use tokio::task::JoinHandle;
-use tokio::time::{Instant, interval};
+use tokio::time::{Instant, interval, sleep};
 
 use crate::am;
 use crate::implem::camera::CameraArgs;
@@ -172,9 +172,8 @@ impl VideoWrapper {
 								).await;
 								*video_manager.lock().await = Some(vm);
 							}
-							{
-								*mon.lock().await = Instant::now();
-							}
+							// Wait for the buffer to repopulate before running the check
+							sleep(Duration::from_secs(3)).await;
 						}
 					}
 				}
