@@ -34,19 +34,21 @@ impl VideoManager {
 		let mut frame_buffer: Vec<H264NalUnit> = Vec::with_capacity(100);
 
 		let task_handle = tokio::spawn(async move {
-			while let Ok(nal) = stream.next().await {
+			'stream: while let Ok(nal) = stream.next().await {
 				match nal.unit_code {
 					7 => {
 						seq_param = Some(nal);
-						continue;
+						continue 'stream;
 					}
 					8 => {
 						pic_param = Some(nal);
-						continue;
+						continue 'stream;
 					}
 					5 => frame_buffer.clear(),
-					1 => *mon.lock().await = Instant::now(),
 					_ => {}
+				}
+				{
+					*mon.lock().await = Instant::now();
 				}
 
 				let mut write_err = Vec::with_capacity(0);
