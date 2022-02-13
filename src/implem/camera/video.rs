@@ -3,7 +3,7 @@ use std::process;
 use std::time::Duration;
 
 use h264_nal_paging::{H264NalUnit, H264Stream};
-use tokio::process::{Child, Command};
+use tokio::process::Child;
 use tokio::task::JoinHandle;
 use tokio::time::{Instant, interval, sleep};
 
@@ -127,12 +127,6 @@ impl VideoWrapper {
 						};
 						if elapsed > 30 {
 							error!("Timeout on restarting video session.");
-							Command::new("sudo")
-								.arg("reboot")
-								.spawn()
-								.unwrap();
-
-							int.tick().await;
 							process::exit(1);
 						}
 					}
