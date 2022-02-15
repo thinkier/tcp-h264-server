@@ -44,11 +44,11 @@ impl VideoManager {
 						pic_param = Some(nal);
 						continue 'stream;
 					}
-					5 => frame_buffer.clear(),
+					5 => {
+						frame_buffer.clear();
+						*mon.lock().await = Instant::now();
+					}
 					_ => {}
-				}
-				{
-					*mon.lock().await = Instant::now();
 				}
 
 				let mut write_err = Vec::with_capacity(0);
@@ -143,7 +143,7 @@ impl VideoWrapper {
 						let earlier = { Instant::clone(&*mon.lock().await) };
 						Instant::now().duration_since(earlier)
 					};
-					if elapsed.as_secs() > 1 {
+					if elapsed.as_secs() > 5 {
 						if let Some(vm) = {
 							video_manager.lock().await.take()
 						} {
